@@ -1,0 +1,60 @@
+[package]
+name = "ark-prodcheck"
+version = "0.1.0"
+authors = [
+    "Marcin Górny <marcin.gorny.94@protonmail.com>"
+]
+description = "A library for efficient prodcheck"
+homepage = "https://arkworks.rs"
+repository = "https://github.com/mmagician/prodcheck/"
+keywords = ["cryptography", "finite-fields", "polynomials"]
+categories = ["cryptography"]
+include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+license = "MIT/Apache-2.0"
+edition = "2018"
+resolver = "2"
+
+[dependencies]
+ark-ff = { version = "0.4.0-alpha", default-features = false }
+ark-ec = { version = "0.4.0-alpha", default-features = false }
+ark-serialize = { version = "0.4.0-alpha", default-features = false, features = ["derive"] }
+ark-std = { version = "0.4.0-alpha", default-features = false }
+ark-poly = { version = "0.4.0-alpha", default-features = false }
+blake2 = { version = "0.9", default-features = false }
+hashbrown = { version = "0.12.3" }
+rayon = { version = "1", optional = true }
+ark-linear-sumcheck = { path = "../sumcheck", default-features = false }
+itertools = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+ark-test-curves = { version = "0.4.0-alpha", default-features = false, features = ["bls12_381_scalar_field", "bls12_381_curve"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+incremental = true
+panic = 'abort'
+
+[profile.bench]
+opt-level = 3
+debug = false
+rpath = false
+lto = "thin"
+incremental = true
+debug-assertions = false
+
+[profile.dev]
+opt-level = 0
+panic = 'abort'
+
+[profile.test]
+opt-level = 3
+lto = "thin"
+incremental = true
+debug-assertions = true
+debug = true
+
+[features]
+default = ["std"]
+std = ["ark-ff/std", "ark-serialize/std", "blake2/std", "ark-std/std", "ark-poly/std"]
+parallel = ["std", "ark-ff/parallel", "ark-poly/parallel", "ark-std/parallel", "rayon"]
