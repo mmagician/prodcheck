@@ -93,83 +93,72 @@ impl<E: Pairing> MLProdcheck<E> {
     }
 }
 
+// Compute MLE f of v in v.num_vars() + 1 variables
 pub fn compute_f<E: Pairing>(
     v: &DenseMultilinearExtension<E::ScalarField>,
 ) -> (DenseMultilinearExtension<E::ScalarField>, E::ScalarField) {
     let m = v.num_vars();
-    // 2. Compute MLE f of v:
     let mut evals = vec![E::ScalarField::zero(); 1 << (m + 1)];
 
-    // define the claim p
-    let mut p: E::ScalarField = E::ScalarField::zero();
-    for l in 0..=m {
-        // for each l, we need to define the MLE f over {1^l, 0, {0,1}^{m-l}}
-        // for simplifying the code, define lhs = {1^l, 0}, rhs = {0,1}^{m-l}
-
-        let ones = vec![1u8; l];
-
-        // let mut rhs: Vec<E::ScalarField> = Vec::with_capacity(m - l);
-        let x_hypercube = (0..m - l).map(|_| 0..2u8).multi_cartesian_product();
-        if m == l {
-            // P = f(1, 1, ..., 0)
-
-            // case where m = l, x_hypercube is empty.
-            // index = 11...0
-            let index = (1 << m) - 1;
-            let x = vec![];
-            p = compute_xy_vectors_from_x::<E>(x, l, &v);
-
-            evals[index] = p;
-        } else {
-            for b_x in x_hypercube {
-                let mut x: Vec<u8> = Vec::with_capacity(m - l);
-                for (_, bool_elem) in b_x.iter().enumerate() {
-                    x.push(*bool_elem);
-                }
-                let f_index: Vec<u8> = [ones.clone(), vec![0u8], x.clone()].concat();
-                let f_index = f_index
-                    .iter()
-                    .rev()
-                    .fold(0, |acc, b| (acc << 1) + *b as usize);
-
-                let prod = compute_xy_vectors_from_x::<E>(x, l, &v);
-
-                evals[f_index] = prod;
-            }
-        }
+    // cover the case when x_hypercube is empty
+    if m == 0 {
+        evals[0] = v.evaluations[0];
     }
+
+    let x_hypercube = (0..m).map(|_| 0..2u8).multi_cartesian_product();
+    // case where first element is 0:
+    for b_x in x_hypercube.clone() {
+
+        let mut x: Vec<u8> = Vec::with_capacity(m);
+        for (_, bool_elem) in b_x.iter().enumerate() {
+            x.push(*bool_elem);
+        }
+        let v_index = x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
+
+        let f_index: Vec<u8> = [vec![0u8], x.clone()].concat();
+        let f_index = f_index
+            .iter()
+            .rev()
+            .fold(0, |acc, b| (acc << 1) + *b as usize);
+        evals[f_index] = v.evaluations[v_index];
+    }
+
+    // case where first element is 1:
+    for b_x in x_hypercube {
+
+        let mut x: Vec<u8> = Vec::with_capacity(m);
+        for (_, bool_elem) in b_x.iter().enumerate() {
+            x.push(*bool_elem);
+        }
+
+        let f_index: Vec<u8> = [vec![1u8], x.clone()].concat();
+        let f_index = f_index
+            .iter()
+            .rev()
+            .fold(0, |acc, b| (acc << 1) + *b as usize);
+
+        let f_index_l: Vec<u8> = [x.clone(), vec![0u8]].concat();
+        let f_index_l = f_index_l
+            .iter()
+            .rev()
+            .fold(0, |acc, b| (acc << 1) + *b as usize);
+
+        let f_index_r: Vec<u8> = [x.clone(), vec![1u8]].concat();
+        let f_index_r = f_index_r
+            .iter()
+            .rev()
+            .fold(0, |acc, b| (acc << 1) + *b as usize);
+
+        evals[f_index] = evals[f_index_l] * &evals[f_index_r];
+
+    }
+
+    // Extract the claim P. It's at index f(1,1,1,...0), i.e. in LE b0111..., or (1<<m) - 1
+    let index = (1 << m) - 1;
+    let p = evals[index];
 
     let f = DenseMultilinearExtension::from_evaluations_vec(m + 1, evals);
     (f, p)
-}
-
-#[inline(always)]
-pub fn compute_xy_vectors_from_x<E: Pairing>(
-    x: Vec<u8>,
-    l: usize,
-    v: &DenseMultilinearExtension<E::ScalarField>,
-) -> E::ScalarField {
-    let y_hypercube = (0..l).map(|_| 0..2u8).multi_cartesian_product();
-    let mut xys: Vec<Vec<u8>> = Vec::with_capacity(1 << l);
-    if l == 0 {
-        xys.push(x.clone());
-    } else {
-        for b_y in y_hypercube {
-            let mut y: Vec<u8> = Vec::with_capacity(l);
-            for (_, bool_elem) in b_y.iter().enumerate() {
-                y.push(*bool_elem);
-            }
-            let xy = [x.clone(), y].concat();
-            xys.push(xy);
-        }
-    }
-    xys.iter()
-        .map(|xy| {
-            let index = xy.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
-            // no need to run the actual evaluation, since v is already given in evaluation form
-            v.evaluations[index]
-        })
-        .product()
 }
 
 #[cfg(test)]
@@ -181,75 +170,10 @@ mod tests {
     use crate::ml_prodcheck::compute_f;
     use ark_std::{One, UniformRand, Zero};
 
-    use super::compute_xy_vectors_from_x;
-
-    #[test]
-    fn xy_computed_correctly() {
-        let mut rng = test_rng();
-        for _ in 0..100 {
-            let v = DenseMultilinearExtension::<Fr>::rand(3, &mut rng);
-
-            let x = vec![1u8, 0u8, 1u8];
-            let l = 0;
-            let p = compute_xy_vectors_from_x::<Bls12_381>(x, l, &v);
-            let expected = v
-                .evaluate(&[Fr::from(1), Fr::from(0), Fr::from(1)])
-                .unwrap();
-            assert_eq!(p, expected);
-
-            let x = vec![1u8, 0u8];
-            let l = 1;
-            let p = compute_xy_vectors_from_x::<Bls12_381>(x, l, &v);
-            let expected = v
-                .evaluate(&[Fr::from(1), Fr::from(0), Fr::from(0)])
-                .unwrap()
-                * v.evaluate(&[Fr::from(1), Fr::from(0), Fr::from(1)])
-                    .unwrap();
-            assert_eq!(p, expected);
-
-            let x = vec![1u8];
-            let l = 2;
-            let p = compute_xy_vectors_from_x::<Bls12_381>(x, l, &v);
-            let expected = v
-                .evaluate(&[Fr::from(1), Fr::from(0), Fr::from(0)])
-                .unwrap()
-                * v.evaluate(&[Fr::from(1), Fr::from(0), Fr::from(1)])
-                    .unwrap()
-                * v.evaluate(&[Fr::from(1), Fr::from(1), Fr::from(0)])
-                    .unwrap()
-                * v.evaluate(&[Fr::from(1), Fr::from(1), Fr::from(1)])
-                    .unwrap();
-            assert_eq!(p, expected);
-
-            let x = vec![];
-            let l = 3;
-            let p = compute_xy_vectors_from_x::<Bls12_381>(x, l, &v);
-            let expected = v
-                .evaluate(&[Fr::from(0), Fr::from(0), Fr::from(0)])
-                .unwrap()
-                * v.evaluate(&[Fr::from(0), Fr::from(0), Fr::from(1)])
-                    .unwrap()
-                * v.evaluate(&[Fr::from(0), Fr::from(1), Fr::from(0)])
-                    .unwrap()
-                * v.evaluate(&[Fr::from(0), Fr::from(1), Fr::from(1)])
-                    .unwrap()
-                * v.evaluate(&[Fr::from(1), Fr::from(0), Fr::from(0)])
-                    .unwrap()
-                * v.evaluate(&[Fr::from(1), Fr::from(0), Fr::from(1)])
-                    .unwrap()
-                * v.evaluate(&[Fr::from(1), Fr::from(1), Fr::from(0)])
-                    .unwrap()
-                * v.evaluate(&[Fr::from(1), Fr::from(1), Fr::from(1)])
-                    .unwrap();
-            assert_eq!(p, expected);
-        }
-    }
-
     #[test]
     fn f_computed_correctly() {
         let mut rng = test_rng();
-        for m in 0..10 {
-            println!("m: {}", m);
+        for m in 0..=10 {
             let v = DenseMultilinearExtension::<Fr>::rand(m, &mut rng);
             let (f, p) = compute_f::<Bls12_381>(&v);
 
