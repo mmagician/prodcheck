@@ -8,9 +8,9 @@ fn bench_f(c: &mut Criterion) {
     let mut rng = test_rng();
     let mut group = c.benchmark_group("compute f");
 
-    for m in [5usize, 10usize, 15usize].iter() {
-        let v = DenseMultilinearExtension::<Fr>::rand(*m, &mut rng);
-        group.bench_with_input(BenchmarkId::from_parameter(m), m, |b, _| {
+    for s in [5usize, 10usize, 15usize].iter() {
+        let v = DenseMultilinearExtension::<Fr>::rand(*s, &mut rng);
+        group.bench_with_input(BenchmarkId::from_parameter(s), s, |b, _| {
             b.iter(|| compute_f::<Bls12_381>(&v));
         });
     }

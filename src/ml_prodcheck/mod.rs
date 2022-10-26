@@ -96,37 +96,37 @@ impl<E: Pairing> MLProdcheck<E> {
 pub fn compute_f<E: Pairing>(
     v: &DenseMultilinearExtension<E::ScalarField>,
 ) -> (DenseMultilinearExtension<E::ScalarField>, E::ScalarField) {
-    let m = v.num_vars();
-    let mut evals = vec![E::ScalarField::zero(); 1 << (m + 1)];
+    let s = v.num_vars();
+    let mut evals = vec![E::ScalarField::zero(); 1 << (s + 1)];
 
     // cover the case when x_hypercube is empty
-    if m == 0 {
+    if s == 0 {
         evals[0] = v.evaluations[0];
     }
 
     // case where first element is 0:
-    for b_x in 0..(1 << m) {
+    for b_x in 0..(1 << s) {
         let v_index = usize::from_le(b_x);
         let f_index = v_index << 1;
         evals[f_index] = v.evaluations[v_index];
     }
 
     // case where first element is 1:
-    for b_x in 0..(1 << m) {
+    for b_x in 0..(1 << s) {
         let v_index = usize::from_le(b_x);
         let f_index = (v_index << 1) + 1;
 
         let f_index_l = v_index;
-        let f_index_r = v_index + (1 << m);
+        let f_index_r = v_index + (1 << s);
 
         evals[f_index] = evals[f_index_l] * &evals[f_index_r];
     }
 
-    // Extract the claim P. It's at index f(1,1,1,...0), i.e. in LE b0111..., or (1<<m) - 1
-    let index = (1 << m) - 1;
+    // Extract the claim P. It's at index f(1,1,1,...0), i.e. in LE b0111..., or (1<<s) - 1
+    let index = (1 << s) - 1;
     let p = evals[index];
 
-    let f = DenseMultilinearExtension::from_evaluations_vec(m + 1, evals);
+    let f = DenseMultilinearExtension::from_evaluations_vec(s + 1, evals);
     (f, p)
 }
 
@@ -142,17 +142,17 @@ mod tests {
     #[test]
     fn f_computed_correctly() {
         let mut rng = test_rng();
-        for m in 0..=10 {
-            let v = DenseMultilinearExtension::<Fr>::rand(m, &mut rng);
+        for s in 0..=10 {
+            let v = DenseMultilinearExtension::<Fr>::rand(s, &mut rng);
             let (f, p) = compute_f::<Bls12_381>(&v);
 
             // assert f(1, 1, ..., 0) = P
-            let mut f_point = vec![Fr::one(); m];
+            let mut f_point = vec![Fr::one(); s];
             f_point.push(Fr::zero());
             assert_eq!(p, f.evaluate(&f_point).unwrap());
 
             let mut f_point = vec![Fr::zero()];
-            let bool_point: Vec<_> = (0..m).map(|_| bool::rand(&mut rng)).collect();
+            let bool_point: Vec<_> = (0..s).map(|_| bool::rand(&mut rng)).collect();
             let v_point: Vec<_> = bool_point.iter().map(|b| Fr::from(*b as u8)).collect();
             f_point.extend(&v_point);
             // assert v(r) = f(0, r)
