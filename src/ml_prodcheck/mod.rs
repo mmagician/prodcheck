@@ -114,12 +114,7 @@ pub fn compute_f<E: Pairing>(
             x.push(*bool_elem);
         }
         let v_index = x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
-
-        let f_index: Vec<u8> = [vec![0u8], x.clone()].concat();
-        let f_index = f_index
-            .iter()
-            .rev()
-            .fold(0, |acc, b| (acc << 1) + *b as usize);
+        let f_index = v_index << 1;
         evals[f_index] = v.evaluations[v_index];
     }
 
@@ -131,23 +126,11 @@ pub fn compute_f<E: Pairing>(
             x.push(*bool_elem);
         }
 
-        let f_index: Vec<u8> = [vec![1u8], x.clone()].concat();
-        let f_index = f_index
-            .iter()
-            .rev()
-            .fold(0, |acc, b| (acc << 1) + *b as usize);
+        let v_index = x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
+        let f_index = (v_index << 1) + 1;
 
-        let f_index_l: Vec<u8> = [x.clone(), vec![0u8]].concat();
-        let f_index_l = f_index_l
-            .iter()
-            .rev()
-            .fold(0, |acc, b| (acc << 1) + *b as usize);
-
-        let f_index_r: Vec<u8> = [x.clone(), vec![1u8]].concat();
-        let f_index_r = f_index_r
-            .iter()
-            .rev()
-            .fold(0, |acc, b| (acc << 1) + *b as usize);
+        let f_index_l = v_index;
+        let f_index_r = v_index + (1 << m);
 
         evals[f_index] = evals[f_index_l] * &evals[f_index_r];
 
