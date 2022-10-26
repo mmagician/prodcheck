@@ -248,20 +248,22 @@ mod tests {
     #[test]
     fn f_computed_correctly() {
         let mut rng = test_rng();
-        let m = 0;
-        let v = DenseMultilinearExtension::<Fr>::rand(m, &mut rng);
-        let (f, p) = compute_f::<Bls12_381>(&v);
+        for m in 0..10 {
+            println!("m: {}", m);
+            let v = DenseMultilinearExtension::<Fr>::rand(m, &mut rng);
+            let (f, p) = compute_f::<Bls12_381>(&v);
 
-        // assert f(1, 1, ..., 0) = P
-        let mut f_point = vec![Fr::one(); m];
-        f_point.push(Fr::zero());
-        assert_eq!(p, f.evaluate(&f_point).unwrap());
+            // assert f(1, 1, ..., 0) = P
+            let mut f_point = vec![Fr::one(); m];
+            f_point.push(Fr::zero());
+            assert_eq!(p, f.evaluate(&f_point).unwrap());
 
-        let mut f_point = vec![Fr::zero()];
-        let bool_point: Vec<_> = (0..m).map(|_| bool::rand(&mut rng)).collect();
-        let v_point: Vec<_> = bool_point.iter().map(|b| Fr::from(*b as u8)).collect();
-        f_point.extend(&v_point);
-        // assert v(r) = f(0, r)
-        assert_eq!(v.evaluate(&v_point).unwrap(), f.evaluate(&f_point).unwrap());
+            let mut f_point = vec![Fr::zero()];
+            let bool_point: Vec<_> = (0..m).map(|_| bool::rand(&mut rng)).collect();
+            let v_point: Vec<_> = bool_point.iter().map(|b| Fr::from(*b as u8)).collect();
+            f_point.extend(&v_point);
+            // assert v(r) = f(0, r)
+            assert_eq!(v.evaluate(&v_point).unwrap(), f.evaluate(&f_point).unwrap());
+        }
     }
 }
