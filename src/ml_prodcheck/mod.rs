@@ -108,32 +108,20 @@ pub fn compute_f<E: Pairing>(
     let x_hypercube = (0..m).map(|_| 0..2u8).multi_cartesian_product();
     // case where first element is 0:
     for b_x in x_hypercube.clone() {
-
-        let mut x: Vec<u8> = Vec::with_capacity(m);
-        for (_, bool_elem) in b_x.iter().enumerate() {
-            x.push(*bool_elem);
-        }
-        let v_index = x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
+        let v_index = b_x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
         let f_index = v_index << 1;
         evals[f_index] = v.evaluations[v_index];
     }
 
     // case where first element is 1:
     for b_x in x_hypercube {
-
-        let mut x: Vec<u8> = Vec::with_capacity(m);
-        for (_, bool_elem) in b_x.iter().enumerate() {
-            x.push(*bool_elem);
-        }
-
-        let v_index = x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
+        let v_index = b_x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
         let f_index = (v_index << 1) + 1;
 
         let f_index_l = v_index;
         let f_index_r = v_index + (1 << m);
 
         evals[f_index] = evals[f_index_l] * &evals[f_index_r];
-
     }
 
     // Extract the claim P. It's at index f(1,1,1,...0), i.e. in LE b0111..., or (1<<m) - 1
