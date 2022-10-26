@@ -93,7 +93,7 @@ impl<E: Pairing> MLProdcheck<E> {
     }
 }
 
-fn compute_f<E: Pairing>(
+pub fn compute_f<E: Pairing>(
     v: &DenseMultilinearExtension<E::ScalarField>,
 ) -> (DenseMultilinearExtension<E::ScalarField>, E::ScalarField) {
     let m = v.num_vars();
@@ -144,7 +144,7 @@ fn compute_f<E: Pairing>(
 }
 
 #[inline(always)]
-fn compute_xy_vectors_from_x<E: Pairing>(
+pub fn compute_xy_vectors_from_x<E: Pairing>(
     x: Vec<u8>,
     l: usize,
     v: &DenseMultilinearExtension<E::ScalarField>,

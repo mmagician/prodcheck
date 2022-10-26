@@ -29,6 +29,7 @@ itertools = { version = "0.10", default-features = false }
 [dev-dependencies]
 ark-test-curves = { version = "0.4.0-alpha", default-features = false, features = ["bls12_381_scalar_field", "bls12_381_curve"] }
 ark-std = { version = "0.4.0-alpha", default-features = false, features = ["getrandom"] }
+criterion = { version = "0.3", default-features = false }
 
 [profile.release]
 opt-level = 3
@@ -54,6 +55,10 @@ lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
+
+[[bench]]
+name = "util_benches"
+harness = false
 
 [features]
 default = ["std"]
