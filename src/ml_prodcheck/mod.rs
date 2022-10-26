@@ -11,7 +11,6 @@ use ark_linear_sumcheck::{
 };
 use ark_poly::{DenseMultilinearExtension, MultilinearExtension};
 use ark_std::{marker::PhantomData, rc::Rc, vec::Vec, One, Zero};
-use itertools::Itertools;
 
 pub struct MLProdcheck<E: Pairing>(#[doc(hidden)] PhantomData<E>);
 
@@ -105,17 +104,16 @@ pub fn compute_f<E: Pairing>(
         evals[0] = v.evaluations[0];
     }
 
-    let x_hypercube = (0..m).map(|_| 0..2u8).multi_cartesian_product();
     // case where first element is 0:
-    for b_x in x_hypercube.clone() {
-        let v_index = b_x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
+    for b_x in 0..(1 << m) {
+        let v_index = usize::from_le(b_x);
         let f_index = v_index << 1;
         evals[f_index] = v.evaluations[v_index];
     }
 
     // case where first element is 1:
-    for b_x in x_hypercube {
-        let v_index = b_x.iter().rev().fold(0, |acc, b| (acc << 1) + *b as usize);
+    for b_x in 0..(1 << m) {
+        let v_index = usize::from_le(b_x);
         let f_index = (v_index << 1) + 1;
 
         let f_index_l = v_index;
