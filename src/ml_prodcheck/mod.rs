@@ -67,13 +67,17 @@ impl<E: Pairing> MLProdcheck<E> {
 
                     let y_hypercube = (0..l).map(|_| 0..2u8).multi_cartesian_product();
                     let mut xys: Vec<Vec<u8>> = Vec::with_capacity(1 << l);
-                    for b_y in y_hypercube {
-                        let mut y: Vec<u8> = Vec::with_capacity(l);
-                        for (_, bool_elem) in b_y.iter().enumerate() {
-                            y.push(*bool_elem);
+                    if l == 0 {
+                        xys.push(x.clone());
+                    } else {
+                        for b_y in y_hypercube {
+                            let mut y: Vec<u8> = Vec::with_capacity(l);
+                            for (_, bool_elem) in b_y.iter().enumerate() {
+                                y.push(*bool_elem);
+                            }
+                            let xy = [x.clone(), y].concat();
+                            xys.push(xy);
                         }
-                        let xy = [x.clone(), y].concat();
-                        xys.push(xy);
                     }
 
                     evals[f_index] = xys
