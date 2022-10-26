@@ -166,8 +166,7 @@ fn compute_xy_vectors_from_x<E: Pairing>(
     xys.iter()
         .map(|xy| {
             // turn the u8 vector into a vector of scalar field elements
-            let point: Vec<E::ScalarField> =
-                xy.iter().map(|b| E::ScalarField::from(*b)).collect();
+            let point: Vec<E::ScalarField> = xy.iter().map(|b| E::ScalarField::from(*b)).collect();
             v.evaluate(&point).unwrap()
         })
         .product()
