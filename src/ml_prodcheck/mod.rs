@@ -9,7 +9,7 @@ use ark_linear_sumcheck::{
     rng::{Blake2s512Rng, FeedableRNG},
     Error,
 };
-use ark_poly::{polynomial, DenseMultilinearExtension, MultilinearExtension};
+use ark_poly::{DenseMultilinearExtension, MultilinearExtension};
 use ark_std::{marker::PhantomData, rc::Rc, vec::Vec, One, UniformRand, Zero};
 
 pub struct MLProdcheck<E: Pairing>(#[doc(hidden)] PhantomData<E>);
@@ -46,7 +46,8 @@ impl<E: Pairing> MLProdcheck<E> {
         //  G(x, t) = eq(t, x) * f(x,0)*f(x,1) - f(1,x)
         // g(t) = \sum_{x \in {0,1}^n} G(x, t)
         let g = compute_G::<E>(&f, &tau);
-        let polynomial = ListOfProductsOfPolynomials::new(v.num_vars());
+        let mut polynomial = ListOfProductsOfPolynomials::new(v.num_vars());
+        polynomial.add_product(vec![Rc::new(g)], E::ScalarField::one());
 
         // 7. Provide openings and proofs of f(0, gamma) = g(gamma)
 
@@ -102,20 +103,20 @@ pub fn compute_f<E: Pairing>(
     let mut evals = vec![E::ScalarField::zero(); 1 << (s + 1)];
 
     // case where first element is 0:
-    for b_x in 0usize..(1 << s) {
-        let (v_index, _) = b_x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
+    for x in 0usize..(1 << s) {
+        let (le_x, _) = x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
 
-        let f_index = v_index << 1;
-        evals[f_index] = v.evaluations[v_index];
+        let f_index = le_x << 1;
+        evals[f_index] = v.evaluations[le_x];
     }
 
     // case where first element is 1:
-    for b_x in 0usize..(1 << s) {
-        let (v_index, _) = b_x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
-        let f_index = (v_index << 1) + 1;
+    for x in 0usize..(1 << s) {
+        let (le_x, _) = x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
+        let f_index = (le_x << 1) + 1;
 
-        let f_index_l = v_index;
-        let f_index_r = v_index + (1 << s);
+        let f_index_l = le_x;
+        let f_index_r = le_x + (1 << s);
 
         evals[f_index] = evals[f_index_l] * &evals[f_index_r];
     }
@@ -138,29 +139,19 @@ pub fn compute_G<E: Pairing>(
     let mut fs_evals = vec![E::ScalarField::zero(); 1 << (s)];
     let eq = compute_mle_eq::<E>(t, s);
 
-    for b_x in 0usize..(1 << s) {
-        let (v_index, _) = b_x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
+    for x in 0usize..(1 << s) {
+        let (le_x, _) = x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
 
-        println!("b_x: {}", b_x);
-        let f_index = (v_index << 1) + 1;
-        println!("f_index: {}", f_index);
+        let f_index = (le_x << 1) + 1;
 
-        let f_index_l = v_index;
-        println!("f_index_l: {}", f_index_l);
-        let f_index_r = v_index + (1 << s);
-        println!("f_index_r: {}", f_index_r);
+        let f_index_l = le_x;
+        let f_index_r = le_x + (1 << s);
 
-        fs_evals[v_index] = eq[v_index]
+        fs_evals[le_x] = eq[le_x]
             * (f.evaluations[f_index] - f.evaluations[f_index_l] * &f.evaluations[f_index_r]);
     }
     // fs = f(1,x)) - f(x,0)*f(x,1)
-    let fs = DenseMultilinearExtension::from_evaluations_vec(s, fs_evals);
-    // G_t(x) = eq(t, x) * fs(x)
-    // let mut polynomial = ListOfProductsOfPolynomials::new(s);
-    // polynomial.add_product(vec![Rc::new(eq), Rc::new(fs)], E::ScalarField::one());
-
-    // polynomial
-    fs
+    DenseMultilinearExtension::from_evaluations_vec(s, fs_evals)
 }
 
 fn compute_mle_eq<E: Pairing>(
@@ -168,12 +159,13 @@ fn compute_mle_eq<E: Pairing>(
     s: usize,
 ) -> DenseMultilinearExtension<E::ScalarField> {
     let mut eq_evals = vec![E::ScalarField::one(); 1 << s];
-    for b_x in 0usize..(1 << s) {
-        let (v_index, _) = b_x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
-        // turn b_x into a vector of field elements, where each element is F::zero() or F::one()
-        let v_field: Vec<E::ScalarField> = (0..s).rev()
+    for x in 0usize..(1 << s) {
+        let (le_x, _) = x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
+        // turn x into a vector of field elements, where each element is F::zero() or F::one()
+        let x_field: Vec<E::ScalarField> = (0..s)
+            .rev()
             .map(|i| {
-                if (b_x >> i) & 1 == 1 {
+                if (x >> i) & 1 == 1 {
                     E::ScalarField::one()
                 } else {
                     E::ScalarField::zero()
@@ -186,11 +178,11 @@ fn compute_mle_eq<E: Pairing>(
             .iter()
             .enumerate()
             .map(|(i, t_i)| {
-                *t_i * &v_field[i]
-                    + (E::ScalarField::one() - t_i) * (E::ScalarField::one() - v_field[i])
+                *t_i * &x_field[i]
+                    + (E::ScalarField::one() - t_i) * (E::ScalarField::one() - x_field[i])
             })
             .product();
-        eq_evals[v_index] = eq_i;
+        eq_evals[le_x] = eq_i;
     }
     DenseMultilinearExtension::from_evaluations_vec(s, eq_evals)
 }
