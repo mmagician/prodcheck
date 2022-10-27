@@ -26,16 +26,17 @@ impl<E: Pairing> MLProdcheck<E> {
     /// Generate proof of the prod of polynomial v over {0,1}^`num_vars`
     pub fn prove(v: &DenseMultilinearExtension<E::ScalarField>) -> Result<Proof<E>, Error> {
         let mut fs_rng = Blake2s512Rng::setup();
-        // fs_rng.feed(&polynomial.info())?;
 
         // 1. Commit to v
         let comm_v = E::G1::default();
+        fs_rng.feed(&comm_v)?;
 
         // 2. Compute f from v
         let (f, p) = compute_f::<E>(v);
 
         // 3. Commit to f
         let comm_f = E::G1::default();
+        fs_rng.feed(&comm_f)?;
 
         // 4. use the FS randomness to sample a random tau
         let tau: Vec<E::ScalarField> = (0..v.num_vars())
@@ -44,17 +45,16 @@ impl<E: Pairing> MLProdcheck<E> {
 
         // 5. Compute MLE g of f:
         //  G(x, t) = eq(t, x) * f(x,0)*f(x,1) - f(1,x)
-        // g(t) = \sum_{x \in {0,1}^n} G(x, t)
         let g = compute_G::<E>(&f, &tau);
         let mut polynomial = ListOfProductsOfPolynomials::new(v.num_vars());
         polynomial.add_product(vec![Rc::new(g)], E::ScalarField::one());
+        fs_rng.feed(&polynomial.info())?;
 
         // 7. Provide openings and proofs of f(0, gamma) = g(gamma)
 
         // 8. Provide openings and proofs of f(1, ..., 1, 0) = P
 
         // 5. Run sum check protocol on g
-
         let mut prover_state = IPForMLSumcheck::prover_init(&polynomial);
         let mut verifier_msg = None;
         let mut prover_msgs = Vec::with_capacity(polynomial.num_variables);
@@ -79,7 +79,10 @@ impl<E: Pairing> MLProdcheck<E> {
         proof: &Proof<E>,
     ) -> Result<SubClaim<E::ScalarField>, Error> {
         let mut fs_rng = Blake2s512Rng::setup();
+        fs_rng.feed(&proof.comm_v)?;
+        fs_rng.feed(&proof.comm_f)?;
         fs_rng.feed(polynomial_info)?;
+        
         let mut verifier_state = IPForMLSumcheck::verifier_init(polynomial_info);
         for i in 0..polynomial_info.num_variables {
             let prover_msg = proof.sumcheck_proof.get(i).expect("proof is incomplete");
