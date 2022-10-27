@@ -169,8 +169,9 @@ fn compute_mle_eq<E: Pairing>(
 ) -> DenseMultilinearExtension<E::ScalarField> {
     let mut eq_evals = vec![E::ScalarField::one(); 1 << s];
     for b_x in 0usize..(1 << s) {
+        let (v_index, _) = b_x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
         // turn b_x into a vector of field elements, where each element is F::zero() or F::one()
-        let v_field: Vec<E::ScalarField> = (0..s)
+        let v_field: Vec<E::ScalarField> = (0..s).rev()
             .map(|i| {
                 if (b_x >> i) & 1 == 1 {
                     E::ScalarField::one()
@@ -189,7 +190,7 @@ fn compute_mle_eq<E: Pairing>(
                     + (E::ScalarField::one() - t_i) * (E::ScalarField::one() - v_field[i])
             })
             .product();
-        eq_evals[b_x] = eq_i;
+        eq_evals[v_index] = eq_i;
     }
     DenseMultilinearExtension::from_evaluations_vec(s, eq_evals)
 }
