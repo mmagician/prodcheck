@@ -100,15 +100,16 @@ pub fn compute_f<E: Pairing>(
     let mut evals = vec![E::ScalarField::zero(); 1 << (s + 1)];
 
     // case where first element is 0:
-    for b_x in 0..(1 << s) {
-        let v_index = usize::from_le(b_x);
+    for b_x in 0usize..(1 << s) {
+        let (v_index, _) = b_x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
+
         let f_index = v_index << 1;
         evals[f_index] = v.evaluations[v_index];
     }
 
     // case where first element is 1:
-    for b_x in 0..(1 << s) {
-        let v_index = usize::from_le(b_x);
+    for b_x in 0usize..(1 << s) {
+        let (v_index, _) = b_x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
         let f_index = (v_index << 1) + 1;
 
         let f_index_l = v_index;
