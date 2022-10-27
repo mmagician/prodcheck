@@ -152,8 +152,7 @@ mod tests {
             assert_eq!(p, f.evaluate(&f_point).unwrap());
 
             let mut f_point = vec![Fr::zero()];
-            let bool_point: Vec<_> = (0..s).map(|_| bool::rand(&mut rng)).collect();
-            let v_point: Vec<_> = bool_point.iter().map(|b| Fr::from(*b as u8)).collect();
+            let v_point: Vec<_> = (0..s).map(|_| Fr::rand(&mut rng)).collect();
             f_point.extend(&v_point);
             // assert v(r) = f(0, r)
             assert_eq!(v.evaluate(&v_point).unwrap(), f.evaluate(&f_point).unwrap());
