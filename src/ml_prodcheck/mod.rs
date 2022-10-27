@@ -99,11 +99,6 @@ pub fn compute_f<E: Pairing>(
     let s = v.num_vars();
     let mut evals = vec![E::ScalarField::zero(); 1 << (s + 1)];
 
-    // cover the case when x_hypercube is empty
-    if s == 0 {
-        evals[0] = v.evaluations[0];
-    }
-
     // case where first element is 0:
     for b_x in 0..(1 << s) {
         let v_index = usize::from_le(b_x);
