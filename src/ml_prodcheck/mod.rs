@@ -98,30 +98,46 @@ impl<E: Pairing> MLProdcheck<E> {
     }
 }
 
-// Compute MLE f of v in v.num_vars() + 1 variables
+// Compute MLE f of v in s + 1 variables (s = v.num_vars())
+// We need two passes over the boolean hypercube of size 2^s:
+// In the first pass we set f(0, x) = v(x)
+// In the second pass we compute f(1, x)
 pub fn compute_f<E: Pairing>(
     v: &DenseMultilinearExtension<E::ScalarField>,
 ) -> (DenseMultilinearExtension<E::ScalarField>, E::ScalarField) {
     let s = v.num_vars();
     let mut evals = vec![E::ScalarField::zero(); 1 << (s + 1)];
 
-    // case where first element is 0:
+    // case where first element is 0, i.e. f(0, x) = v(x)
     for x in 0usize..(1 << s) {
+        // find the LE representation of x
         let (le_x, _) = x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
 
-        let f_index = le_x << 1;
-        evals[f_index] = v.evaluations[le_x];
+        // function f is indexed by integers in [0, 2^(s+1)), while v has index in [0, 2^s)
+        // e.g. for s=3, x = 6 = b110, or le_x = b011
+        // v(x) = v(1, 1, 0), is in position le_x=3 of vector v
+        // for f(0, x) = v(x), we need f(0, 1, 1, 0) = v(1, 1, 0)
+        // and we need le_f_index = 0110,
+        // so we need to shl x_le by 1
+        let le_f_index = le_x << 1;
+        evals[le_f_index] = v.evaluations[le_x];
     }
 
     // case where first element is 1:
     for x in 0usize..(1 << s) {
         let (le_x, _) = x.reverse_bits().overflowing_shr(usize::BITS - (s as u32));
-        let f_index = (le_x << 1) + 1;
+        // now compute f(1, x) = f(x, 0)*f(x, 1)
+        // using same example as above:
+        // for f(1, x) = f(1, 1, 1, 0)
+        // so from le_x = b011, shl by 1 and add 1 to get b0111
+        let le_f_index = (le_x << 1) + 1;
 
-        let f_index_l = le_x;
-        let f_index_r = le_x + (1 << s);
+        // f(x,0) = f(1, 1, 0, 0), so due to leading 0 in LE, no change needed
+        let le_f_index_0 = le_x;
+        // f(x,1): f(1,1,0,1), we add b1000 and b011 to get b1011
+        let le_f_index_1 = le_x + (1 << s);
 
-        evals[f_index] = evals[f_index_l] * &evals[f_index_r];
+        evals[le_f_index] = evals[le_f_index_0] * &evals[le_f_index_1];
     }
 
     // Extract the claim P. It's at index f(1,1,1,...0), i.e. in LE b0111..., or (1<<s) - 1
